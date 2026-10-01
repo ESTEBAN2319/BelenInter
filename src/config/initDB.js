@@ -1,5 +1,5 @@
 import sequelize from './db.js';
-import Paquete from '../models/paquetesModel.js'; // Obligatorio para que Sequelize registre la tabla
+import Paquete from '../models/paquetesModel.js'; 
 
 export const initDB = async () => {
   try {
