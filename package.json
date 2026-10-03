@@ -1,4 +1,5 @@
 {
+<<<<<<< HEAD
   "name": "backend",
   "version": "1.0.0",
   "type": "module",
@@ -22,5 +23,11 @@
     "sequelize": "^6.37.3",
     "swagger-jsdoc": "^6.3.0",
     "swagger-ui-express": "^5.0.1"
+=======
+  "dependencies": {
+    "pg": "^8.23.0",
+    "pg-hstore": "^2.3.4",
+    "sequelize": "^6.37.8"
+>>>>>>> 4e59e5b (feat(frontend): implement dashboard with AI scanner and protected routes)
   }
 }
