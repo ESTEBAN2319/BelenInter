@@ -1,5 +1,6 @@
 import sequelize from './db.js';
-import Paquete from '../models/paquetesModel.js'; 
+import Paquete from '../models/paquetesModel.js';   
+import Usuario from '../models/usuario.js';
 
 export const initDB = async () => {
   try {

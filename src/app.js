@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { initDB } from './config/initDB.js';
 import paquetesRoutes from './routes/paquetesRoutes.js';
+import authRoutes from './routes/authRoutes.js';
 
 dotenv.config();
 
@@ -14,7 +15,7 @@ app.use(express.json());
 
 // Rutas principales de paquetes
 app.use('/api/paquetes', paquetesRoutes);
-
+app.use('/api/auth', authRoutes);
 // Endpoint de verificación de estado
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'OK', message: 'Servidor BelenInter funcionando correctamente' });

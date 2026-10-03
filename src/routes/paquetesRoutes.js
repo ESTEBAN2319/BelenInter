@@ -6,6 +6,7 @@ import {
   obtenerPaquetes,
   marcarEntregado,
 } from '../controllers/paqueteController.js';
+import { verificarToken } from '../middlewares/authMiddleware.js';
 
 const router = Router();
 
@@ -17,10 +18,10 @@ const upload = multer({
   },
 });
 
-// Rutas de la API
-router.post('/escanear', upload.single('imagen'), escanearEtiqueta);
-router.post('/guardar', guardarPaquete);
-router.get('/', obtenerPaquetes);
-router.patch('/:id/entregar', marcarEntregado);
+// Rutas de la API (Protegidas con JWT)
+router.post('/escanear', verificarToken, upload.single('imagen'), escanearEtiqueta);
+router.post('/guardar', verificarToken, guardarPaquete);
+router.get('/', verificarToken, obtenerPaquetes);
+router.patch('/:id/entregar', verificarToken, marcarEntregado);
 
 export default router;
