@@ -6,6 +6,14 @@ export default function Dashboard() {
   const [paquetes, setPaquetes] = useState([]);
   const [busqueda, setBusqueda] = useState('');
 
+  // ESTADO MODO OSCURO / CLARO
+  const [darkMode, setDarkMode] = useState(() => {
+    return localStorage.getItem('theme') === 'dark' || true;
+  });
+
+  // Modal Confirmar Logout
+  const [logoutModalAbierto, setLogoutModalAbierto] = useState(false);
+
   // Modal de Escáner
   const [escanearAbierto, setEscanearAbierto] = useState(false);
   const [modoCamara, setModoCamara] = useState(false);
@@ -25,7 +33,26 @@ export default function Dashboard() {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
+  const searchInputRef = useRef(null);
   const navigate = useNavigate();
+
+  // Atajo de teclado (Ctrl+K o Cmd+K) para enfocar la búsqueda
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  const toggleTheme = () => {
+    const nuevoTema = !darkMode;
+    setDarkMode(nuevoTema);
+    localStorage.setItem('theme', nuevoTema ? 'dark' : 'light');
+  };
 
   const cargarPaquetes = async () => {
     try {
@@ -40,7 +67,7 @@ export default function Dashboard() {
     cargarPaquetes();
   }, []);
 
-  const cerrarSesion = () => {
+  const confirmarCerrarSesion = () => {
     detenerCamara();
     localStorage.removeItem('token_beleninter');
     navigate('/login');
@@ -66,24 +93,30 @@ export default function Dashboard() {
   const obtenerEstiloEstado = (estadoRaw) => {
     const estado = (estadoRaw || '').toLowerCase().trim();
     if (estado.includes('entregado')) {
-      return 'bg-emerald-100 text-emerald-700 border-emerald-300';
+      return darkMode 
+        ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' 
+        : 'bg-emerald-100 text-emerald-700 border-emerald-300';
     }
     if (estado.includes('devolucion') || estado.includes('devuelto') || estado.includes('cancelado')) {
-      return 'bg-rose-100 text-rose-700 border-rose-300';
+      return darkMode 
+        ? 'bg-rose-500/10 text-rose-400 border-rose-500/30' 
+        : 'bg-rose-100 text-rose-700 border-rose-300';
     }
     if (estado.includes('bodega')) {
-      return 'bg-blue-100 text-blue-700 border-blue-300';
+      return darkMode 
+        ? 'bg-amber-500/10 text-amber-400 border-amber-500/30' 
+        : 'bg-amber-100 text-amber-700 border-amber-300';
     }
-    return 'bg-amber-100 text-amber-700 border-amber-300';
+    return darkMode 
+      ? 'bg-blue-500/10 text-blue-400 border-blue-500/30' 
+      : 'bg-blue-100 text-blue-700 border-blue-300';
   };
 
-  // Cambiar estado del paquete (Entregado / Devolución)
   const actualizarEstado = async (idPaquete, nuevoEstado) => {
     try {
       await clienteAxios.put(`/paquetes/${idPaquete}`, { estado: nuevoEstado });
       cargarPaquetes();
     } catch (error) {
-      // Fallback si la API requiere otro formato
       setPaquetes(paquetes.map(p => p.id === idPaquete ? { ...p, estado: nuevoEstado } : p));
     }
   };
@@ -180,7 +213,6 @@ export default function Dashboard() {
       return;
     }
 
-    // Imagen por defecto si no se capturó o subió ninguna foto
     const paqueteAEnviar = {
       ...formDatos,
       imagen_url: formDatos.imagen_url || 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&q=80&w=400'
@@ -210,67 +242,174 @@ export default function Dashboard() {
     });
   };
 
-  // Filtrado simple por búsqueda
   const paquetesFiltrados = paquetes.filter(p => {
     const guia = (p.numero_guia || p.guia || '').toLowerCase();
     const cliente = (p.nombre_cliente || p.destinatario || '').toLowerCase();
     return guia.includes(busqueda.toLowerCase()) || cliente.includes(busqueda.toLowerCase());
   });
 
+  const totalBodega = paquetes.filter(p => (p.estado || '').toLowerCase().includes('bodega')).length;
+  const totalEntregados = paquetes.filter(p => (p.estado || '').toLowerCase().includes('entregado')).length;
+
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-800 font-sans flex flex-col">
+    <div className={`min-h-screen font-sans flex flex-col transition-colors duration-300 ${
+      darkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-100 text-slate-800'
+    }`}>
       
-      {/* BARRA SUPERIOR LIMPIA */}
-      <header className="bg-white border-b border-slate-200 px-8 py-4 flex justify-between items-center shadow-sm sticky top-0 z-10">
-        <div className="flex items-center space-x-3">
-          <div className="bg-blue-600 text-white p-2 rounded-xl text-lg font-black">📦</div>
+      {/* 1. CABECERA CON BÚSQUEDA AMPLIA */}
+      <header className={`px-8 py-4 flex flex-col md:flex-row gap-4 justify-between items-center backdrop-blur-md sticky top-0 z-20 border-b transition-colors duration-300 ${
+        darkMode ? 'bg-slate-900/90 border-slate-800' : 'bg-white/90 border-slate-200 shadow-sm'
+      }`}>
+        {/* LOGO BRAND */}
+        <div className="flex items-center space-x-3 shrink-0">
+          <div className="bg-gradient-to-br from-orange-500 to-amber-600 text-white p-2.5 rounded-2xl shadow-lg shadow-orange-500/20 text-lg font-black">
+            📦
+          </div>
           <div>
-            <h1 className="text-xl font-bold text-slate-800 leading-none">BelenInter</h1>
-            <p className="text-xs text-slate-400 mt-0.5">Gestión Logística e Inventario</p>
+            <h1 className={`text-xl font-black tracking-wider leading-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+              NORCEL <span className="text-orange-500 font-extrabold">BELÉN</span>
+            </h1>
+            <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Sistema Logístico e Inventario</p>
           </div>
         </div>
 
-        <div className="flex items-center space-x-4">
-          {/* Búsqueda Directa */}
-          <div className="relative">
-            <input 
-              type="text" 
-              placeholder="Buscar por guía o cliente..."
-              value={busqueda}
-              onChange={(e) => setBusqueda(e.target.value)}
-              className="w-80 bg-slate-50 border border-slate-300 rounded-xl pl-10 pr-4 py-2 text-sm focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
-            />
-            <span className="absolute left-3 top-2.5 text-slate-400 text-sm">🔍</span>
-          </div>
+        {/* BARRA DE BÚSQUEDA XL (PROMINENTE) */}
+        <div className="w-full max-w-2xl relative flex items-center">
+          <span className="absolute left-4 text-orange-500 text-lg pointer-events-none">🔍</span>
+          
+          <input 
+            ref={searchInputRef}
+            type="text" 
+            placeholder="Buscar guía o cliente (ej: 24006... o Julio Santos)"
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            className={`w-full rounded-2xl pl-11 pr-28 py-3 text-base font-medium transition-all shadow-md focus:outline-none focus:ring-2 focus:ring-orange-500 ${
+              darkMode 
+                ? 'bg-slate-950 border border-slate-700/90 text-white placeholder-slate-500 focus:border-orange-500' 
+                : 'bg-slate-50 border border-slate-300 text-slate-900 placeholder-slate-400 focus:border-orange-500'
+            }`}
+          />
 
-          <button 
-            onClick={() => setEscanearAbierto(true)}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm px-5 py-2.5 rounded-xl shadow-md transition-all flex items-center space-x-2 cursor-pointer"
+          <div className="absolute right-3.5 flex items-center space-x-2">
+            {busqueda ? (
+              <button
+                onClick={() => setBusqueda('')}
+                className="bg-slate-700/50 hover:bg-slate-700 text-slate-200 rounded-full w-6 h-6 flex items-center justify-center text-xs transition-all cursor-pointer"
+                title="Limpiar búsqueda"
+              >
+                ✕
+              </button>
+            ) : (
+              <kbd className={`hidden sm:inline-block px-2.5 py-1 text-xs font-mono rounded-lg border ${
+                darkMode ? 'bg-slate-800 border-slate-700 text-slate-400' : 'bg-slate-200 border-slate-300 text-slate-500'
+              }`}>
+                Ctrl K
+              </kbd>
+            )}
+
+            {busqueda && (
+              <span className="bg-orange-500 text-white text-xs font-extrabold px-2.5 py-0.5 rounded-full shadow-sm">
+                {paquetesFiltrados.length}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* ACCIONES SECUNDARIAS */}
+        <div className="flex items-center space-x-3 shrink-0">
+          {/* INTERRUPTOR MODO OSCURO / CLARO */}
+          <button
+            onClick={toggleTheme}
+            className={`relative w-16 h-8 flex items-center rounded-full p-1 cursor-pointer transition-colors duration-300 shadow-inner ${
+              darkMode ? 'bg-slate-800 border border-slate-700' : 'bg-amber-100 border border-amber-300'
+            }`}
+            title={darkMode ? 'Cambiar a Modo Claro' : 'Cambiar a Modo Oscuro'}
           >
-            <span>📷</span> <span>+ Escanear Guía (IA)</span>
+            <span className="absolute left-1.5 text-xs">🌙</span>
+            <span className="absolute right-1.5 text-xs">☀️</span>
+            <div
+              className={`w-6 h-6 rounded-full bg-white shadow-md transform transition-transform duration-300 flex items-center justify-center text-xs z-10 ${
+                darkMode ? 'translate-x-8 bg-slate-900 text-amber-300' : 'translate-x-0 bg-amber-400 text-white'
+              }`}
+            >
+              {darkMode ? '✨' : '⚡'}
+            </div>
           </button>
 
+          {/* BOTÓN ESCANEAR CON IA */}
           <button 
-            onClick={cerrarSesion}
-            className="bg-slate-100 hover:bg-slate-200 text-slate-600 p-2.5 rounded-xl transition-colors text-sm cursor-pointer"
+            onClick={() => setEscanearAbierto(true)}
+            className="bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold text-sm px-4 py-2.5 rounded-xl shadow-lg shadow-orange-500/20 transition-all flex items-center space-x-2 cursor-pointer active:scale-[0.98]"
+          >
+            <span>🤖</span> <span className="hidden sm:inline">+ Escanear Guía (IA)</span>
+          </button>
+
+          {/* BOTÓN CERRAR SESIÓN */}
+          <button 
+            onClick={() => setLogoutModalAbierto(true)}
+            className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 px-3 py-2.5 rounded-xl border border-rose-500/30 font-semibold text-xs flex items-center space-x-2 transition-all cursor-pointer shadow-sm"
             title="Cerrar Sesión"
           >
-            🚪
+            <span>🚪</span>
+            <span className="hidden lg:inline">Salir</span>
           </button>
         </div>
       </header>
 
-      {/* CONTENIDO PRINCIPAL: TABLA A ANCHO COMPLETO */}
-      <main className="flex-1 p-8 max-w-7xl w-full mx-auto">
-        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+      {/* 2. CONTENEDOR PRINCIPAL */}
+      <main className="flex-1 p-8 max-w-7xl w-full mx-auto space-y-6">
+        
+        {/* MÉTRICAS */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          <div className={`border rounded-2xl p-5 shadow-lg backdrop-blur-sm flex items-center justify-between transition-colors ${
+            darkMode ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'
+          }`}>
+            <div>
+              <p className={`text-xs font-semibold uppercase tracking-wider ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Total Paquetes</p>
+              <h3 className={`text-2xl font-black mt-1 ${darkMode ? 'text-white' : 'text-slate-900'}`}>{paquetes.length}</h3>
+            </div>
+            <div className={`p-3 rounded-xl border text-xl ${darkMode ? 'bg-slate-800/80 border-slate-700' : 'bg-slate-100 border-slate-200'}`}>📊</div>
+          </div>
+
+          <div className={`border rounded-2xl p-5 shadow-lg backdrop-blur-sm flex items-center justify-between transition-colors ${
+            darkMode ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'
+          }`}>
+            <div>
+              <p className="text-xs font-semibold text-amber-500 uppercase tracking-wider">En Bodega</p>
+              <h3 className="text-2xl font-black text-amber-500 mt-1">{totalBodega}</h3>
+            </div>
+            <div className="bg-amber-500/10 border border-amber-500/20 p-3 rounded-xl text-xl">🏬</div>
+          </div>
+
+          <div className={`border rounded-2xl p-5 shadow-lg backdrop-blur-sm flex items-center justify-between transition-colors ${
+            darkMode ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'
+          }`}>
+            <div>
+              <p className="text-xs font-semibold text-emerald-500 uppercase tracking-wider">Entregados</p>
+              <h3 className="text-2xl font-black text-emerald-500 mt-1">{totalEntregados}</h3>
+            </div>
+            <div className="bg-emerald-500/10 border border-emerald-500/20 p-3 rounded-xl text-xl">🚀</div>
+          </div>
+        </div>
+
+        {/* TABLA DE PAQUETES */}
+        <div className={`border rounded-3xl shadow-xl backdrop-blur-md overflow-hidden transition-colors ${
+          darkMode ? 'bg-slate-900/90 border-slate-800' : 'bg-white border-slate-200'
+        }`}>
           
-          <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-            <h2 className="font-bold text-slate-700 text-base">Inventario de Paquetes ({paquetesFiltrados.length})</h2>
+          <div className={`p-6 border-b flex justify-between items-center ${
+            darkMode ? 'border-slate-800 bg-slate-900/40' : 'border-slate-100 bg-slate-50/50'
+          }`}>
+            <h2 className={`font-extrabold text-base tracking-wide ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+              Inventario de Paquetes <span className={darkMode ? 'text-slate-400 font-medium' : 'text-slate-500 font-medium'}>({paquetesFiltrados.length})</span>
+            </h2>
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <thead className="bg-slate-100 text-slate-500 uppercase text-xs font-bold tracking-wider border-b border-slate-200">
+              <thead className={`uppercase text-xs font-bold tracking-wider border-b ${
+                darkMode ? 'bg-slate-950/80 text-slate-400 border-slate-800' : 'bg-slate-100 text-slate-600 border-slate-200'
+              }`}>
                 <tr>
                   <th className="px-6 py-4">Nº Guía</th>
                   <th className="px-6 py-4">Cliente</th>
@@ -279,54 +418,54 @@ export default function Dashboard() {
                   <th className="px-6 py-4 text-right">Acciones</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className={`divide-y ${darkMode ? 'divide-slate-800/60' : 'divide-slate-200/80'}`}>
                 {paquetesFiltrados.length === 0 ? (
                   <tr>
-                    <td colSpan="5" className="px-6 py-12 text-center text-slate-400">
-                      No se encontraron paquetes registrados.
+                    <td colSpan="5" className={`px-6 py-12 text-center ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                      {busqueda ? `No se encontraron paquetes para "${busqueda}"` : 'No hay paquetes registrados.'}
                     </td>
                   </tr>
                 ) : (
                   paquetesFiltrados.map((p) => {
                     const estadoTexto = p.estado || 'en_bodega';
                     return (
-                      <tr key={p.id || p.numero_guia} className="hover:bg-slate-50 transition-colors">
-                        <td className="px-6 py-4 font-mono font-bold text-blue-600">
+                      <tr key={p.id || p.numero_guia} className={`transition-colors ${
+                        darkMode ? 'hover:bg-slate-800/40' : 'hover:bg-slate-50'
+                      }`}>
+                        <td className="px-6 py-4 font-mono font-bold text-orange-500">
                           {p.numero_guia || p.guia || 'N/A'}
                         </td>
-                        <td className="px-6 py-4 font-semibold text-slate-800">
+                        <td className={`px-6 py-4 font-semibold ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>
                           {p.nombre_cliente || p.destinatario || 'N/A'}
                         </td>
-                        <td className="px-6 py-4 text-slate-500">
+                        <td className={`px-6 py-4 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                           {formatearFecha(p.fecha_ingreso || p.created_at)}
                         </td>
                         <td className="px-6 py-4">
-                          <span className={`px-3 py-1 rounded-full text-xs font-bold border uppercase tracking-wider ${obtenerEstiloEstado(estadoTexto)}`}>
+                          <span className={`px-3 py-1 rounded-full text-xs font-extrabold border uppercase tracking-wider ${obtenerEstiloEstado(estadoTexto)}`}>
                             {estadoTexto.replace('_', ' ')}
                           </span>
                         </td>
                         <td className="px-6 py-4 text-right space-x-2">
-                          {/* Botón Entregado */}
                           <button 
                             onClick={() => actualizarEstado(p.id, 'entregado')}
                             disabled={estadoTexto === 'entregado'}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                               estadoTexto === 'entregado'
-                                ? 'bg-slate-100 text-slate-400 border border-slate-200'
-                                : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-200'
+                                ? (darkMode ? 'bg-slate-800 text-slate-500 border border-slate-700/50' : 'bg-slate-200 text-slate-400 border border-slate-300')
+                                : 'bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 border border-emerald-500/30'
                             }`}
                           >
                             ✓ Entregado
                           </button>
 
-                          {/* Botón Devolución */}
                           <button 
                             onClick={() => actualizarEstado(p.id, 'devolucion')}
                             disabled={estadoTexto === 'devolucion'}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                               estadoTexto === 'devolucion'
-                                ? 'bg-slate-100 text-slate-400 border border-slate-200'
-                                : 'bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-200'
+                                ? (darkMode ? 'bg-slate-800 text-slate-500 border border-slate-700/50' : 'bg-slate-200 text-slate-400 border border-slate-300')
+                                : 'bg-rose-500/10 text-rose-600 hover:bg-rose-500/20 border border-rose-500/30'
                             }`}
                           >
                             ↩ Devolución
@@ -342,11 +481,50 @@ export default function Dashboard() {
         </div>
       </main>
 
-      {/* MODAL ESCÁNER DE ENTRADA CON FOTO OPCIONAL */}
+      {/* MODAL CERRAR SESIÓN */}
+      {logoutModalAbierto && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
+          <div className={`border rounded-3xl p-6 max-w-sm w-full shadow-2xl space-y-4 text-center ${
+            darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-800'
+          }`}>
+            <div className="text-4xl bg-rose-500/10 w-16 h-16 mx-auto rounded-full flex items-center justify-center border border-rose-500/20">
+              🚪
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-lg font-black tracking-wide">¿Cerrar Sesión?</h3>
+              <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                Saldrás del sistema de gestión de Norcel Belén.
+              </p>
+            </div>
+            <div className="flex space-x-3 pt-2">
+              <button 
+                onClick={() => setLogoutModalAbierto(false)} 
+                className={`flex-1 py-2.5 rounded-xl text-xs font-bold cursor-pointer ${
+                  darkMode ? 'bg-slate-800 hover:bg-slate-700 text-slate-300' : 'bg-slate-200 hover:bg-slate-300 text-slate-700'
+                }`}
+              >
+                Cancelar
+              </button>
+              <button 
+                onClick={confirmarCerrarSesion} 
+                className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shadow-lg shadow-rose-600/30 cursor-pointer"
+              >
+                Sí, Salir
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL ESCÁNER */}
       {escanearAbierto && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white border border-slate-200 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4">
-            <h3 className="text-lg font-bold text-slate-800">Escanear Etiqueta de Entrada</h3>
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
+          <div className={`border rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4 ${
+            darkMode ? 'bg-slate-900 border-slate-700/70 text-white' : 'bg-white border-slate-200 text-slate-800'
+          }`}>
+            <h3 className="text-lg font-black tracking-wide">
+              Escanear Etiqueta <span className="text-orange-500">(IA)</span>
+            </h3>
 
             <canvas ref={canvasRef} className="hidden" />
 
@@ -354,14 +532,16 @@ export default function Dashboard() {
               <div className="space-y-3">
                 <button
                   onClick={iniciarCamara}
-                  className="w-full p-4 border-2 border-dashed border-blue-400 hover:border-blue-600 bg-blue-50/50 hover:bg-blue-50 rounded-2xl flex flex-col items-center justify-center transition-all cursor-pointer"
+                  className="w-full p-4 border-2 border-dashed border-orange-500/40 hover:border-orange-500 bg-orange-500/5 hover:bg-orange-500/10 rounded-2xl flex flex-col items-center justify-center transition-all cursor-pointer"
                 >
-                  <span className="text-blue-600 font-bold text-sm">📷 Tomar Foto / Escanear Cámara</span>
-                  <span className="text-xs text-slate-400 mt-1">Sube o toma una foto del paquete (opcional)</span>
+                  <span className="text-orange-500 font-bold text-sm">📸 Encender Cámara Web</span>
+                  <span className={`text-xs mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Escanear etiqueta directamente</span>
                 </button>
 
-                <label className="w-full p-3 border border-slate-200 hover:border-slate-300 bg-slate-50 rounded-2xl flex flex-col items-center justify-center cursor-pointer transition-all">
-                  <span className="text-slate-600 text-xs font-semibold">📁 Seleccionar Foto de Archivo</span>
+                <label className={`w-full p-3 border rounded-2xl flex flex-col items-center justify-center cursor-pointer transition-all ${
+                  darkMode ? 'border-slate-700/80 bg-slate-800/50 hover:border-slate-600' : 'border-slate-300 bg-slate-50 hover:border-slate-400'
+                }`}>
+                  <span className="text-xs font-semibold">📂 Seleccionar Foto de Archivo</span>
                   <input type="file" accept="image/*" onChange={handleSeleccionarArchivo} className="hidden" />
                 </label>
               </div>
@@ -369,12 +549,12 @@ export default function Dashboard() {
 
             {modoCamara && (
               <div className="space-y-3 text-center">
-                <div className="relative rounded-2xl overflow-hidden bg-black border border-slate-200">
+                <div className="relative rounded-2xl overflow-hidden bg-black border border-slate-700">
                   <video ref={videoRef} autoPlay playsInline className="w-full max-h-56 object-cover" />
                 </div>
                 <button
                   onClick={tomarFoto}
-                  className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-2xl shadow transition-all cursor-pointer text-sm"
+                  className="w-full py-3 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold rounded-2xl shadow-lg transition-all cursor-pointer text-sm"
                 >
                   📸 Capturar Foto
                 </button>
@@ -383,44 +563,52 @@ export default function Dashboard() {
 
             {imagenSeleccionada && (
               <div className="space-y-3">
-                <img src={imagenSeleccionada} alt="Foto del paquete" className="max-h-40 w-full object-contain rounded-2xl bg-slate-100 p-2 border border-slate-200" />
+                <img src={imagenSeleccionada} alt="Foto paquete" className="max-h-40 w-full object-contain rounded-2xl bg-slate-950 p-2 border border-slate-700" />
 
                 {procesandoIA ? (
-                  <p className="text-blue-600 animate-pulse text-center text-xs font-semibold">Extrayendo datos con la IA de Groq...</p>
+                  <p className="text-orange-500 animate-pulse text-center text-xs font-semibold">Extrayendo datos con la IA de Groq...</p>
                 ) : (
                   <div>
                     {!modoEdicion ? (
-                      <div className="bg-slate-50 p-3.5 rounded-2xl text-xs space-y-1.5 border border-slate-200 text-slate-700">
-                        <p>Nº Guía: <strong className="text-blue-600 font-mono text-sm ml-1">{formDatos.numero_guia}</strong></p>
-                        <p>Cliente: <strong className="text-slate-900 ml-1">{formDatos.nombre_cliente}</strong></p>
+                      <div className={`p-3.5 rounded-2xl text-xs space-y-1.5 border ${
+                        darkMode ? 'bg-slate-950 border-slate-800 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700'
+                      }`}>
+                        <p>Nº Guía: <strong className="text-orange-500 font-mono text-sm ml-1">{formDatos.numero_guia}</strong></p>
+                        <p>Cliente: <strong className="ml-1">{formDatos.nombre_cliente}</strong></p>
                         <div className="pt-2 text-right">
-                          <button onClick={() => setModoEdicion(true)} className="text-blue-600 hover:underline font-bold">
+                          <button onClick={() => setModoEdicion(true)} className="text-orange-500 hover:underline font-bold">
                             ✏️ Editar Datos
                           </button>
                         </div>
                       </div>
                     ) : (
-                      <div className="bg-slate-50 p-3 rounded-2xl text-xs space-y-2 border border-slate-200">
+                      <div className={`p-3 rounded-2xl text-xs space-y-2 border ${
+                        darkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-200'
+                      }`}>
                         <div>
-                          <label className="block font-semibold text-slate-500 mb-0.5">Nº Guía:</label>
+                          <label className="block font-semibold mb-0.5">Nº Guía:</label>
                           <input 
                             type="text" 
                             value={formDatos.numero_guia}
                             onChange={(e) => setFormDatos({ ...formDatos, numero_guia: e.target.value })}
-                            className="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 font-mono text-blue-600"
+                            className={`w-full border rounded-lg px-2.5 py-1.5 font-mono text-orange-500 focus:outline-none focus:border-orange-500 ${
+                              darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-300'
+                            }`}
                           />
                         </div>
                         <div>
-                          <label className="block font-semibold text-slate-500 mb-0.5">Cliente:</label>
+                          <label className="block font-semibold mb-0.5">Cliente:</label>
                           <input 
                             type="text" 
                             value={formDatos.nombre_cliente}
                             onChange={(e) => setFormDatos({ ...formDatos, nombre_cliente: e.target.value })}
-                            className="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-slate-800"
+                            className={`w-full border rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-orange-500 ${
+                              darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-800'
+                            }`}
                           />
                         </div>
                         <div className="text-right">
-                          <button onClick={() => setModoEdicion(false)} className="text-slate-500 font-bold">
+                          <button onClick={() => setModoEdicion(false)} className="font-bold text-orange-500">
                             ✓ Listo
                           </button>
                         </div>
@@ -431,12 +619,14 @@ export default function Dashboard() {
               </div>
             )}
 
-            <div className="flex justify-end space-x-2 pt-2 border-t border-slate-100">
-              <button onClick={cerrarModal} className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-semibold cursor-pointer">
+            <div className={`flex justify-end space-x-2 pt-2 border-t ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}>
+              <button onClick={cerrarModal} className={`px-4 py-2 rounded-xl text-xs font-semibold cursor-pointer ${
+                darkMode ? 'bg-slate-800 hover:bg-slate-700 text-slate-300' : 'bg-slate-200 hover:bg-slate-300 text-slate-700'
+              }`}>
                 Cancelar
               </button>
               {imagenSeleccionada && !procesandoIA && (
-                <button onClick={handleGuardarPaquete} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow cursor-pointer">
+                <button onClick={handleGuardarPaquete} className="px-4 py-2 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white rounded-xl text-xs font-bold shadow-lg cursor-pointer">
                   Guardar Paquete
                 </button>
               )}
