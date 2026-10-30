@@ -1,26 +1,28 @@
 import jwt from 'jsonwebtoken';
 
+// Middleware para verificar que el token es válido
 export const verificarToken = (req, res, next) => {
-  // 1. Extraer el header Authorization
   const authHeader = req.headers['authorization'];
-
-  // El estándar industrial envía el token con el formato: "Bearer <TOKEN>"
   const token = authHeader && authHeader.split(' ')[1];
 
   if (!token) {
-    return res.status(401).json({ error: 'Acceso denegado. No se proporcionó un token de autenticación' });
+    return res.status(401).json({ error: 'Acceso denegado. Token no proporcionado.' });
   }
 
   try {
-    // 2. Verificar la firma del token usando nuestro JWT_SECRET
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    
-    // 3. Adjuntar la información del usuario desencriptada al objeto req
-    req.usuario = decoded;
-
-    // 4. Dar paso al siguiente controller
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret_key_default');
+    req.usuario = decoded; // { id, email, rol }
     next();
   } catch (error) {
-    return res.status(403).json({ error: 'Token inválido o expirado' });
+    return res.status(403).json({ error: 'Token inválido o expirado.' });
+  }
+};
+
+// Middleware exclusivo para Administradores
+export const esAdmin = (req, res, next) => {
+  if (req.usuario && req.usuario.rol === 'administrador') {
+    next();
+  } else {
+    return res.status(403).json({ error: 'Acceso denegado. Se requieren permisos de administrador.' });
   }
 };
