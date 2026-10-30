@@ -6,6 +6,7 @@ import swaggerSpec from './config/swagger.js';
 import { initDB } from './config/initDB.js';
 import paquetesRoutes from './routes/paquetesRoutes.js';
 import authRoutes from './routes/authRoutes.js';
+import { iniciarTareaLimpieza } from './services/limpiezaService.js';
 
 dotenv.config();
 
@@ -36,3 +37,5 @@ const startServer = async () => {
 };
 
 startServer();
+
+iniciarTareaLimpieza();
